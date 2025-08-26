@@ -6,6 +6,20 @@ Docker Environment File: https://github.com/drewwats/automated-downloading/blob/
 
 Docker Compose File: https://github.com/drewwats/automated-downloading/blob/main/docker-compose.yml
 
+## Containers
+
+| App          | Purpose               |
+| ------------ | --------------------- |
+| BAZARR       | Subtitles             |
+| GLUETUN      | VPN                   |
+| LIDARR       | Music                 |
+| TAULTULLI    | Metrics               |
+| PROWLARR     | Index Aggregator      |
+| RADARR       | Movies                |
+| SABNZBD      | NZB/Usenet Downloader |
+| SONARR       | Shows                 |
+| TRANSMISSION | Torrent Downloader    |
+
 ## Notes
 
 * Running container-station on QNAP
