@@ -1,119 +1,117 @@
-version: "2.4"
+# version: "3.6"
 
-# See /volume1/docker/.env to configure environmental variables
+networks:
+  media:
+    driver: bridge
+
+# See /Docker/.env to configure environmental variables
 
 services:
-
-  transmission:
-    image: haugene/transmission-openvpn
-    container_name: transmission
+  gluetun:
+    image: qmcgaw/private-internet-access:latest
+    container_name: gluetun
+    hostname: gluetun
     cap_add:
-      - ALL
-    # RESOURCE SETTINGS (cpu_shares for priority, default it 1024)
-    cpu_shares: 512
-    mem_limit: 256m
-    volumes:
-      - ${TRANSMISSION_HOME}:/data:rw
-      - ${DOCKER_HOME}resolv.conf:/etc/resolv.conf
-      - ${TORRENT_BASE}:/downloads:rw
-    environment:
-    # GENERAL
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      - LOCAL_NETWORK=${LOCAL_NETWORK}
-      - TZ=${TIME_ZONE}
-      - CREATE_TUN_DEVICE=true
-    # PIA/OPENVPN
-      - OPENVPN_PROVIDER=${VPN_PROVIDER}
-      - PIA_OPENVPN_CONFIG_BUNDLE=openvpn
-      - OPENVPN_CONFIG=ca_montreal
-      - OPENVPN_USERNAME=${VPN_USER}
-      - OPENVPN_PASSWORD=${VPN_PASS}
-      - OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60 --mute-replay-warnings
-    # TRANSMISSION
-      # CONFIG OPTIONS FOUND HERE https://github.com/transmission/transmission/wiki/Editing-Configuration-Files
-      - GLOBAL_APPLY_PERMISSIONS=true
-      - TRANSMISSION_BLOCKLIST_ENABLED=false
-      - TRANSMISSION_BLOCKLIST_URL=""
-      - TRANSMISSION_BLOCKLIST_UPDATE_ENABLED=false
-      - TRANSMISSION_UPDATE_TIME=24
-      - TRANSMISSION_CACHE_SIZE_MB=32
-      - TRANSMISSION_HOME=/transmission
-      # Make sure to create the complete, incomplete, and watch subdirectories
-      - TRANSMISSION_DOWNLOAD_DIR=/downloads/complete
-      - TRANSMISSION_INCOMPLETE_DIR=/downloads/incomplete
-      - TRANSMISSION_WATCH_DIR=/downloads/watch
-      # WEB (UI Options blank, kettu, combustion, or transmission-web-control)
-      - TRANSMISSION_WEB_UI=transmission-web-control
-      - TRANSMISSION_RPC_ENABLED=true
-      - TRANSMISSION_RPC_PORT=${TRANSMISSION_PORT}
-      - TRANSMISSION_RPC_WHITELIST_ENABLED=true
-      - TRANSMISSION_RPC_HOST_WHITELIST_ENABLED=false
-      - TRANSMISSION_RPC_WHITELIST="127.0.0.1,192.168.*.*"
-      - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=true
-      - TRANSMISSION_RPC_USERNAME=${RPC_USER}
-      - TRANSMISSION_RPC_PASSWORD=${RPC_PASS}
-      # CONNECTIONS
-      # (allow encryption: 0, prefer encryption: 1, require encryption: 2)
-      - TRANSMISSION_ENCRYPTION=1
-      - TRANSMISSION_PEER_LIMIT_GLOBAL=600
-      - TRANSMISSION_PEER_LIMIT_PER_TORRENT=60
-      - TRANSMISSION_PEER_CONGESTION_ALGORITHM=''
-      - TRANSMISSION_PEER_ID_TTL_HOURS=6
-      - TRANSMISSION_UTP_ENABLED=true
-      # QUEUE
-      - TRANSMISSION_DOWNLOAD_QUEUE_ENABLED-true
-      - TRANSMISSION_DOWNLOAD_QUEUE_SIZE=10
-      - TRANSMISSION_SEED_QUEUE_ENABLED=true
-      - TRANSMISSION_SEED_QUEUE_SIZE=1
-      - TRANSMISSION_QUEUE_STALLED_ENABLED=true
-      - TRANSMISSION_QUEUE_STALLED_MINUTES=5
-      # SEEDING
-      - TRANSMISSION_RATIO_LIMIT_ENABLED=true
-      - TRANSMISSION_RATIO_LIMIT=0
-      - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=1
-      - TRANSMISSION_IDLE_SEEDING_LIMIT_ENABLED=true
-      - TRANSMISSION_IDLE_SEEDING_LIMIT=10
-      # SPEED LIMITS in KB per second
-      - TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED=false
-      - TRANSMISSION_SPEED_LIMIT_DOWN=10000
-      - TRANSMISSION_SPEED_LIMIT_UP_ENABLED=false
-      - TRANSMISSION_SPEED_LIMIT_UP=10000
-      - TRANSMISSION_ALT_SPEED_ENABLED=false
-      # Scheduled throttling of torrent speeds (in minutes after midnight)
-      - TRANSMISSION_ALT_SPEED_TIME_ENABLED=false
-      - TRANSMISSION_ALT_SPEED_TIME_DAY=127
-      - TRANSMISSION_ALT_SPEED_TIME_BEGIN=1020
-      - TRANSMISSION_ALT_SPEED_TIME_END=120
-      - TRANSMISSION_ALT_SPEED_DOWN=3000
-      - TRANSMISSION_ALT_SPEED_UP=3000
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
+      - NET_ADMIN
+    network_mode: bridge
     ports:
+      # Gluetun ports
+      - 7654:8888/tcp # HTTP proxy
+      - 7655:8388/tcp # Shadowsocks
+      - 7656:8388/udp # Shadowsocks
+      - 7657:8000/tcp # Built-in HTTP control server
+      # Other containers' ports
+      - ${SABNZBD_PORT}:8080
+      - ${DELUGE_PORT}:${DELUGE_PORT}
+      - ${QBITTORRENT_PORT}:${QBITTORRENT_PORT}
       - ${TRANSMISSION_PORT}:${TRANSMISSION_PORT}
+      - ${PROWLARR_PORT}:${PROWLARR_PORT}
+      - ${SONARR_PORT}:${SONARR_PORT}
+      - ${RADARR_PORT}:${RADARR_PORT}
+      - ${BAZARR_PORT}:${BAZARR_PORT}
+      - ${LIDARR_PORT}:${LIDARR_PORT}
+      - ${FLARESOLVERR_PORT}:${FLARESOLVERR_PORT}
+    volumes:
+      - ${GLUETUN_HOME}:/gluetun
+    environment:
+      - TZ=${TIME_ZONE}
+      - FIREWALL_OUTBOUND_SUBNETS=${LOCAL_CIDR}
+      # VPN VIA PIA
+      - VPN_SERVICE_PROVIDER=private internet access
+      - PRIVATE_INTERNET_ACCESS_OPENVPN_ENCRYPTION_PRESET=strong
+      - OPENVPN_USER=${VPN_USER}
+      - OPENVPN_PASSWORD=${VPN_PASS}
+      - SERVER_REGIONS=${VPN_REGION}
+      - VPN_PORT_FORWARDING=on
+      - HTTPPROXY=on
+      - SHADOWSOCKS=on
+      - SHADOWSOCKS_PASSWORD=${VPN_SOCKS_PASS}
+      # DNS VIA UNBOUND https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/dns.md
+      - DOT=on
+      - DNS_UPDATE_PERIOD=1h
+      - BLOCK_MALICIOUS=on
+      - BLOCK_SURVEILLANCE=on
+      - BLOCK_ADS=on
     restart: unless-stopped
 
-  jackett:
-    image: ghcr.io/linuxserver/jackett
-    container_name: jackett
-    cpu_shares: 256
-    mem_limit: 256m
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+      - sabnzbd
+      - transmission
+      - sonarr
+      - radarr
     environment:
+      - PUID=0
+      - PGID=0
       - TZ=${TIME_ZONE}
-      - AUTO_UPDATE=true
     volumes:
-      - ${JACKETT_HOME}:/config
-      - ${JACKETT_HOME}temp/:/downloads
-    ports:
-      - ${JACKETT_PORT}:${JACKETT_PORT}
+      - ${PROWLARR_HOME}:/config:rw
+      - ${PROWLARR_HOME}hosts:/etc/hosts
+    restart: unless-stopped
+
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TIME_ZONE}
+    volumes:
+      - ${SABNZBD_HOME}:/config
+      - ${DOWNLOAD_BASE}/complete/:/downloads/complete:rw
+      - ${DOWNLOAD_BASE}/incomplete/usenet/:/downloads/incomplete:rw
+    restart: unless-stopped
+
+  transmission:
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: transmission
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TIME_ZONE}
+      - TRANSMISSION_WEB_HOME=/config/flood-for-transmission/
+      - USER=${RPC_USER}
+      - PASS=${RPC_PASS}
+    volumes:
+      - ${TRANSMISSION_HOME}:/config
+      - ${TRANSMISSION_HOME}/watch:/watch
+      - ${DOWNLOAD_BASE}:/downloads
     restart: unless-stopped
 
   sonarr:
-    image: ghcr.io/linuxserver/sonarr:preview
+    image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
-    cpu_shares: 512
-    mem_limit: 256m
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
     environment:
       - PUID=0
       - PGID=0
@@ -121,16 +119,17 @@ services:
     volumes:
       - ${SONARR_HOME}:/config:rw
       - ${TV_DIR}:/tv:rw
-      - ${TORRENT_BASE}:/downloads:rw
-    ports:
-      - ${SONARR_PORT}:${SONARR_PORT}
+      - ${TV_REQ_DIR}:/requests:rw
+      - ${DOWNLOAD_BASE}/complete/TV/:/downloads/complete/TV:rw
+      - ${DOWNLOAD_BASE}/trash/:/downloads/trash:rw
     restart: unless-stopped
 
   radarr:
-    image: ghcr.io/linuxserver/radarr
+    image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
-    cpu_shares: 512
-    mem_limit: 256m
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
     environment:
       - PUID=0
       - PGID=0
@@ -138,89 +137,82 @@ services:
     volumes:
       - ${RADARR_HOME}:/config:rw
       - ${MOVIE_DIR}:/movies:rw
-      - ${TORRENT_BASE}:/downloads:rw
-    ports:
-      - ${RADARR_PORT}:${RADARR_PORT}
+      - ${MOVIE_REQ_DIR}:/requests:rw
+      - ${DOWNLOAD_BASE}/complete/Movies/:/downloads/complete/Movies:rw
+      - ${DOWNLOAD_BASE}/trash/:/downloads/trash:rw
     restart: unless-stopped
 
   bazarr:
-    image: ghcr.io/linuxserver/bazarr
+    image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
-    cpu_shares: 256
-    mem_limit: 256m
+    network_mode: "service:gluetun"
+    depends_on:
+      - sonarr
+      - radarr
     environment:
       - PUID=0
       - PGID=0
+      - UMASK_SET=022
       - TZ=${TIME_ZONE}
     volumes:
       - ${BAZARR_HOME}:/config:rw
       - ${MOVIE_DIR}:/movies:rw
       - ${TV_DIR}:/tv:rw
-    ports:
-      - ${BAZARR_PORT}:${BAZARR_PORT}
+      - ${TV_REQ_DIR}:/requests/tv:rw
+      - ${MOVIE_REQ_DIR}:/requests/movies:rw
     restart: unless-stopped
 
-  #locast:
-  #  image: tgorg/locast2plex
-  #  container_name: locast
-  #  cpu_shares: 512
-  #  mem_limit: 256m
-  #  environment:
-  #    - username=${LOCAST_USER}
-  #    - password=${LOCAST_PASS}
-  #    - external_addy=${PLEX_HOST}
-  #    - external_port=${LOCAST_PORT}
-  #    - debug=no
-  #  volumes:
-  #    - ${LOCAST_HOME}config.ini:/app/config.ini
-  #  ports:
-  #    - ${LOCAST_PORT}:${LOCAST_PORT}
-  #    - "1900:1900/udp"
-  #  restart: unless-stopped
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIME_ZONE}
+    volumes:
+      - ${LIDARR_HOME}:/config:rw
+      - ${MUSIC_DIR}:/music:rw
+      - ${DOWNLOAD_BASE}/complete/Music/:/downloads/complete/Music:rw
+      - ${DOWNLOAD_BASE}/trash/:/downloads/trash:rw
+    restart: unless-stopped
 
-  #handbrake:
-  #  image: jlesage/handbrake
-  #  container_name: handbrake
-  #  cap_add:
-  #    - SYS_NICE
-  #  cpu_shares: 256
-  #  mem_limit: 256m
-  #  environment:
-  #    - USER_ID=0
-  #    - GROUP_ID=0
-  #    - TZ=${TIME_ZONE}
-  #    # CPU niceness -20 meanest to 19 nicest
-  #    - APP_NICENESS=15
-  #    - HANDBRAKE_DEBUG=0
-  #    - AUTOMATED_CONVERSION_PRESET=General/Very Fast 720p30
-  #    - AUTOMATED_CONVERSION_FORMAT=mkv
-  #    - AUTOMATED_CONVERSION_KEEP_SOURCE=0
-  #    - AUTOMATED_CONVERSION_OUTPUT_DIR=/output
-  #    - AUTOMATED_CONVERSION_OUTPUT_SUBDIR=SAME_AS_SRC
-  #    - AUTOMATED_CONVERSION_SOURCE_STABLE_TIME=5
-  #  volumes:
-  #    - ${HANDBRAKE_HOME}:/config:rw
-  #  # - /volume1/Share/:/storage:ro
-  #    - ${RAW_DIR}:/watch:rw
-  #    - ${OUT_DIR}:/output:rw
-  #  ports:
-  #    - ${HANDBRAKE_PORT}:${HANDBRAKE_PORT}
-  #  restart: unless-stopped
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_HTML=${LOG_HTML:-false}
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+      - TZ=${TIME_ZONE}
+    restart: unless-stopped
 
-  #comskip:
-  #  image: djaydev/auto-comskip
-  #  container_name: comskip
-  #  cpu_shares: 256
-  #  mem_limit: 256m
-  #  environment:
-  #    - PUID=0
-  #    - PGID=0
-  #    - TZ=${TIME_ZONE}
-  #  volumes:
-  #    - ${COMSKIP_HOME}:/config:rw
-  #  # - ${COMSKIP_HOME}comskip.ini:/opt/comskip.ini:rw
-  #    - ${COMSKIP_HOME}temp/:/temp:rw
-  #    - ${RAW_DIR}:/watch:rw
-  #    - ${OUT_DIR}:/output:rw
-  #  restart: unless-stopped
+  tautulli:
+    container_name: metrics
+    image: tautulli/tautulli:latest
+    networks:
+      - media
+    volumes:
+      - ${METRICS_HOME}:/config
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=${TIME_ZONE}
+    ports:
+      - "${METRICS_PORT}:8181/tcp"
+    restart: unless-stopped
 
+
+# Recover Corrupted Sonarr / Radarr DB
+# https://wiki.servarr.com/useful-tools#recovering-a-corrupt-db
+# From Macbook:
+# docker stop radarr
+# scp -O -P 2222 drew@<QNAP_IP>:/share/Container/homes/radarr/radarr.db ~/radarr.db
+# mv ./radarr.db ./radarr_corrupt.db
+# sqlite3 ./radarr_corrupt.db ".recover" | sqlite3 ./radarr.db
+# scp -O -P 2222 ./radarr.db drew@<QNAP_IP>:/share/Container/homes/radarr/radarr.db
+# rm ~/radarr_corrupt.db*
+# docker start radarr
