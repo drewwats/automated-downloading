@@ -6,8 +6,6 @@ Docker Environment File: https://github.com/drewwats/automated-downloading/blob/
 
 Docker Compose File: https://github.com/drewwats/automated-downloading/blob/main/docker-compose.yml
 
-DNS File: https://github.com/drewwats/automated-downloading/blob/main/resolv.conf
-
 ## Notes
 
 * Running container-station on QNAP
